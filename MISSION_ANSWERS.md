@@ -1,21 +1,10 @@
-#  Delivery Checklist — Day 12 Lab Submission
+# Day 12 Lab - Mission Answers
 
-> **Student Name:** Bùi Minh Đức 
+> **Student Name:** Bùi Minh Đức  
 > **Student ID:** 2A202600005  
 > **Date:** 17/04/2026
 
 ---
-
-##  Submission Requirements
-
-Submit a **GitHub repository** containing:
-
-### 1. Mission Answers (40 points)
-
-Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
-
-```markdown
-# Day 12 Lab - Mission Answers
 
 ## Part 1: Localhost vs Production
 
@@ -28,7 +17,7 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
 
 2. **Nhận `question` qua query parameter thay vì request body** — FastAPI hiểu `question: str` trong hàm POST là query param (`/ask?question=...`). Câu hỏi bị ghi vào URL, server log, browser history — vi phạm bảo mật.
    ```python
-   def ask_agent(question: str): 
+   def ask_agent(question: str):
    ```
 
 3. **Không validate input** — Không kiểm tra `question` có rỗng không, không giới hạn độ dài. Dễ bị abuse, gửi câu hỏi cực dài để tốn token/tiền.
@@ -36,12 +25,26 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
 4. **Không có CORS configuration** — Không set CORS middleware, không kiểm soát được domain nào được phép gọi API.
 
 5. **`import os` nhưng không dùng** — Import thừa, cho thấy không có ý định đọc environment variables ở bất kỳ đâu trong file.
-    ```python
-    import os 
-    ```
-...
+   ```python
+   import os
+   ```
+
+---
+
+### Exercise 1.2: Production fixes
+
+Các thay đổi chính trong `production/app.py`:
+
+- Bọc LLM call trong `try/except`, raise `HTTPException` với message rõ ràng thay vì để lộ stack trace
+- Chuyển `question` vào Pydantic request body (`class AskRequest(BaseModel)`)
+- Thêm validation: kiểm tra rỗng, giới hạn độ dài tối đa
+- Thêm `CORSMiddleware` với `allowed_origins` từ env var
+- Đọc toàn bộ config từ `config.py` — không hardcode bất kỳ giá trị nào
+
+---
 
 ### Exercise 1.3: Comparison table
+
 | Feature | Develop | Production | Why Important? |
 |---------|---------|------------|----------------|
 | Config | Hardcode trong code | Đọc từ env vars qua `config.py` | Thay đổi config không cần sửa code, bảo mật secrets |
@@ -54,11 +57,13 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
 | CORS | Không config | CORSMiddleware với allowed_origins | Kiểm soát domain được phép gọi API |
 | Graceful shutdown | Không có | SIGTERM handler + lifespan context | Hoàn thành request đang xử lý trước khi tắt |
 | Reload | `reload=True` luôn | `reload=settings.debug` | Không dùng debug mode trong production |
-...
+
+---
 
 ## Part 2: Docker
 
 ### Exercise 2.1: Dockerfile questions
+
 1. **Base image là gì?**
    `python:3.11` — đây là full Python distribution (~1 GB), bao gồm toàn bộ Python runtime, pip, và các system tools. Phù hợp cho develop vì dễ debug, nhưng nặng cho production.
 
@@ -70,9 +75,9 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
    - Nếu copy `requirements.txt` trước → `pip install` chỉ chạy lại khi dependencies thay đổi
    - Nếu copy toàn bộ code trước → mỗi lần sửa code dù 1 dòng, `pip install` cũng chạy lại từ đầu → build chậm hơn nhiều
    ```dockerfile
-   COPY requirements.txt .        # layer này ít thay đổi
+   COPY requirements.txt .              # layer này ít thay đổi
    RUN pip install -r requirements.txt  # chỉ rebuild khi requirements đổi
-   COPY app.py .                  # layer này thay đổi thường xuyên
+   COPY app.py .                        # layer này thay đổi thường xuyên
    ```
 
 4. **CMD vs ENTRYPOINT khác nhau thế nào?**
@@ -84,85 +89,122 @@ Create a file `MISSION_ANSWERS.md` with your answers to all exercises:
    | Dùng khi | App có thể chạy nhiều mode khác nhau | Container chỉ có 1 mục đích cố định |
    | Kết hợp | `ENTRYPOINT` = executable, `CMD` = default args | — |
 
-   Ví dụ trong Dockerfile này dùng `CMD ["python", "app.py"]` — phù hợp cho develop vì có thể override để debug:
+   Ví dụ trong Dockerfile develop dùng `CMD ["python", "app.py"]` — phù hợp cho develop vì có thể override để debug:
    ```bash
    docker run agent-develop python -c "import app; print('ok')"
    ```
    Production thường dùng `ENTRYPOINT ["python", "app.py"]` để đảm bảo container luôn chạy đúng service.
-...
+
+---
+
+### Exercise 2.2: Production Dockerfile improvements
+
+Production Dockerfile dùng `python:3.11-slim` thay vì `python:3.11` full:
+- Loại bỏ các system tools không cần thiết (gcc, make, ...)
+- Thêm `--no-cache-dir` khi pip install để không lưu cache trong image
+- Thêm `PYTHONDONTWRITEBYTECODE=1` và `PYTHONUNBUFFERED=1`
+- Thêm `HEALTHCHECK` để platform tự detect container unhealthy
+
+---
 
 ### Exercise 2.3: Image size comparison
-- Develop: 1.66 GB
-- Production: 236 GB
-- Difference: 85.8 %
+
+| | Develop | Production |
+|--|---------|------------|
+| Base image | `python:3.11` | `python:3.11-slim` |
+| Image size | ~1.66 GB | ~236 MB |
+| Reduction | — | **85.8%** |
+
+---
 
 ## Part 3: Cloud Deployment
 
 ### Exercise 3.1: Railway deployment
-- URL: https://enthusiastic-amazement-production-7900.up.railway.app
-- Screenshot: ![alt text](image.png)
+
+- **URL:** https://enthusiastic-amazement-production-7900.up.railway.app
+- **Screenshot:** ![Railway deployment](image.png)
+
+### Exercise 3.2: Deployment config
+
+`railway.toml` cấu hình:
+```toml
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+startCommand = "streamlit run app.py --server.address 0.0.0.0 --server.port $PORT"
+healthcheckPath = "/_stcore/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+```
+
+Điểm quan trọng:
+- `$PORT` được Railway inject tự động — không hardcode port
+- `healthcheckPath` để Railway biết khi nào service sẵn sàng nhận traffic
+- `restartPolicyType = "ON_FAILURE"` để tự restart khi crash
+
+---
 
 ## Part 4: API Security
 
-### Exercise 4.1-4.3: Test results
+### Exercise 4.1: API Key authentication test
 
-1. 
+```bash
+# Không có API key → 401
 curl http://localhost:8000/ask -X POST \
   -H "Content-Type: application/json" \
   -d '{"question": "Hello"}'
-{"detail":"Missing API key. Include header: X-API-Key: <your-key>"}(.venv) 
+{"detail":"Missing API key. Include header: X-API-Key: <your-key>"}
 
+# Sai API key → 403
 curl http://localhost:8000/ask -X POST \
   -H "X-API-Key: secret-key-123" \
   -H "Content-Type: application/json" \
   -d '{"question": "Hello"}'
-{"detail":"Invalid API key."}(.venv) 
+{"detail":"Invalid API key."}
+```
 
-2. 
-MDuck@DESKTOP-R3SUQJN MINGW64 /d/AI_Vin/Lab/assignments/day12_ha-tang-cloud_va_deployment/04-api-gateway/production (main)
-$ curl http://localhost:8000/auth/token -X POST \
+### Exercise 4.2: JWT authentication test
+
+```bash
+# Lấy token
+curl http://localhost:8000/auth/token -X POST \
   -H "Content-Type: application/json" \
   -d '{"username": "student", "password": "demo123"}'
-{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdHVkZW50Iiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzY0MTYyOTQsImV4cCI6MTc3NjQxOTg5NH0.8ANSDAEksWzt97tnLYbT4hKgTbIqQzxORaLB98_gz_4","token_type":"bearer","expires_in_minutes":60,"hint":"Include in header: Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."}(.venv) 
-MDuck@DESKTOP-R3SUQJN MINGW64 /d/AI_Vin/Lab/assignments/day12_ha-tang-cloud_va_deployment/04-api-gateway/production (main)
-$ TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdHVkZW50Iiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzY0MTYyOTQsImV4cCI6MTc3NjQxOTg5NH0.8ANSDAEksWzt97tnLYbT4hKgTbIqQzxORaLB98_gz_4"
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer","expires_in_minutes":60}
+
+# Dùng token gọi API
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 curl http://localhost:8000/ask -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"question": "Explain JWT"}'
-{"question":"Explain JWT","answer":"Tôi là AI agent được deploy lên cloud. Câu hỏi của bạn đã được nhận.","usage":{"requests_remaining":9,"budget_remaining_usd":1.9e-05}}(.venv) 
+{"question":"Explain JWT","answer":"...","usage":{"requests_remaining":9,"budget_remaining_usd":1.9e-05}}
+```
 
-3. 
-$ for i in {1..20}; do
+### Exercise 4.3: Rate limiting test
+
+```bash
+for i in {1..20}; do
   curl http://localhost:8000/ask -X POST \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"question": "Test '$i'"}'
   echo ""
 done
-{"question":"Test 1","answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé.","usage":{"requests_remaining":8,"budget_remaining_usd":3.5e-05}}
-{"question":"Test 2","answer":"Tôi là AI agent được deploy lên cloud. Câu hỏi của bạn đã được nhận.","usage":{"requests_remaining":7,"budget_remaining_usd":5.3e-05}}
-{"question":"Test 3","answer":"Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI/Anthropic.","usage":{"requests_remaining":6,"budget_remaining_usd":7.4e-05}}
-{"question":"Test 4","answer":"Tôi là AI agent được deploy lên cloud. Câu hỏi của bạn đã được nhận.","usage":{"requests_remaining":5,"budget_remaining_usd":9.3e-05}}
-{"question":"Test 5","answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé.","usage":{"requests_remaining":4,"budget_remaining_usd":0.000109}}
-{"question":"Test 6","answer":"Tôi là AI agent được deploy lên cloud. Câu hỏi của bạn đã được nhận.","usage":{"requests_remaining":3,"budget_remaining_usd":0.000128}}
-{"question":"Test 7","answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé.","usage":{"requests_remaining":2,"budget_remaining_usd":0.000144}}
-{"question":"Test 8","answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé.","usage":{"requests_remaining":1,"budget_remaining_usd":0.00016}}
-{"question":"Test 9","answer":"Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI/Anthropic.","usage":{"requests_remaining":0,"budget_remaining_usd":0.000181}}
+```
+
+Kết quả: Request 1–10 thành công, request 11+ trả về 429:
+```json
 {"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":24}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":23}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":23}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":23}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":22}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":22}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":22}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":22}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":21}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":21}}
-{"detail":{"error":"Rate limit exceeded","limit":10,"window_seconds":60,"retry_after_seconds":21}}
+```
+
+Rate limiter hoạt động đúng — block sau 10 request/phút.
 
 ### Exercise 4.4: Cost guard implementation
-**Approach:** Implement hàm `check_budget` dùng Redis để track chi phí theo tháng per user.
+
+**Approach:** Dùng Redis để track chi phí theo tháng per user.
 
 **Logic từng bước:**
 1. **Key theo tháng** — `budget:user_id:2026-04` → sang tháng 5 key mới tự động, không cần cron job reset
@@ -171,9 +213,30 @@ done
 4. **Ghi lại** chi phí bằng `incrbyfloat` (atomic, thread-safe)
 5. **TTL 32 ngày** để Redis tự dọn key cũ, tránh memory leak
 
+```python
+def check_budget_redis(user_id: str, estimated_cost: float) -> bool:
+    month_key = datetime.now().strftime("%Y-%m")
+    key = f"budget:{user_id}:{month_key}"
+
+    current = float(_redis_client.get(key) or 0)
+    if current + estimated_cost > 10.0:
+        return False  # Vượt $10/tháng → block
+
+    _redis_client.incrbyfloat(key, estimated_cost)
+    _redis_client.expire(key, 32 * 24 * 3600)  # TTL 32 ngày
+    return True
+```
+
+**In-memory fallback (`CostGuard` class):**
+- `check_budget(user_id)` — kiểm tra trước khi gọi LLM, raise HTTP 402 nếu vượt $1/ngày per user, HTTP 503 nếu vượt $10/ngày global
+- `record_usage(user_id, input_tokens, output_tokens)` — ghi nhận sau khi LLM trả về, tính cost theo giá GPT-4o-mini ($0.15/1M input, $0.60/1M output)
+- `get_usage(user_id)` — trả về usage summary kèm `budget_remaining_usd` và `budget_used_pct`
+
+---
+
 ## Part 5: Scaling & Reliability
 
-### Exercise 5.1-5.5: Implementation notes
+### Exercise 5.1: Health vs Readiness endpoints
 
 Implement 2 endpoints trong `05-scaling-reliability/develop/app.py`:
 
@@ -185,7 +248,7 @@ Implement 2 endpoints trong `05-scaling-reliability/develop/app.py`:
 | Fail → | Platform restart container | LB ngừng route traffic |
 | Trả 503 khi | Process treo, OOM | Đang khởi động / tắt / Redis mất kết nối |
 
----
+### Exercise 5.2: Graceful shutdown
 
 3 cơ chế kết hợp trong `develop/app.py`:
 
@@ -193,7 +256,7 @@ Implement 2 endpoints trong `05-scaling-reliability/develop/app.py`:
 2. **Lifespan shutdown** — set `_is_ready = False` (LB ngừng route), chờ tối đa 30s cho requests hoàn thành
 3. **SIGTERM handler** — log signal, để uvicorn xử lý shutdown
 
----
+### Exercise 5.3: Stateless design
 
 **Vấn đề:** Nếu lưu session trong memory, scale lên nhiều instances thì instance B không đọc được session của instance A.
 
@@ -201,27 +264,23 @@ Implement 2 endpoints trong `05-scaling-reliability/develop/app.py`:
 
 Code có fallback in-memory khi Redis không có (dev local), nhưng không scalable cho production.
 
----
+### Exercise 5.4: Load balancing với Nginx
 
 Nginx dùng Docker DNS `agent` tự động resolve đến tất cả replicas và round-robin qua chúng. `proxy_next_upstream error` đảm bảo failover tự động khi 1 instance die — client không thấy lỗi.
 
+```
 Client → Nginx :8080 → agent_1 → agent_2 → agent_3 (round-robin)
                               ↕
                             Redis (shared state)
-
----
-
-Chạy `python test_stateless.py` — script gửi 5 câu hỏi liên tiếp trong cùng 1 session:
-Dù mỗi request đến instance khác nhau, conversation history vẫn liên tục — xác nhận stateless design hoạt động đúng.
-
 ```
 
+### Exercise 5.5: Stateless test
+
+Chạy `python test_stateless.py` — script gửi 5 câu hỏi liên tiếp trong cùng 1 session. Dù mỗi request đến instance khác nhau, conversation history vẫn liên tục — xác nhận stateless design hoạt động đúng.
+
 ---
 
-### 2. Full Source Code - Lab 06 Complete (60 points)
-
-Link DEMO: https://day12-agent-deployment.vercel.app/
-Minh chứng: ![alt text](image-1.png) ![alt text](image-2.png)
+## Part 6: Lab Complete — DevCoach MVP
 
 ### 6.1: Mô tả sản phẩm
 
@@ -241,7 +300,7 @@ Sản phẩm hỗ trợ **2 deployment style** từ cùng 1 codebase, chia sẻ 
 
 ```
 06-lab-complete/
-├── app.py          ← Streamlit UI (Vercel / Render / Docker)
+├── app.py          ← Streamlit UI (Railway / Render / Docker)
 ├── api/
 │   └── index.py   ← Flask entrypoint (Vercel serverless)
 ├── analyzer.py    ← Core logic: gọi OpenAI, parse JSON, extract text (SHARED)
@@ -249,12 +308,12 @@ Sản phẩm hỗ trợ **2 deployment style** từ cùng 1 codebase, chia sẻ 
 ├── mock_data/     ← CV và JD mẫu để test không cần upload
 ├── Dockerfile     ← python:3.11-slim, HEALTHCHECK built-in
 ├── docker-compose.yml
-├── vercel.toml   ← Vercel config
+├── railway.toml   ← Railway config
 ├── render.yaml    ← Render config
 └── vercel.json    ← Vercel config
 ```
 
-| Layer | Streamlit (Vercel/Render/Docker) | Flask (Vercel) |
+| Layer | Streamlit (Railway/Render/Docker) | Flask (Vercel) |
 |-------|-----------------------------------|----------------|
 | Entry | `app.py` | `api/index.py` |
 | Logic | `analyzer.py` (shared) | `analyzer.py` (shared) |
@@ -293,12 +352,12 @@ Prompt yêu cầu model trả về JSON schema cố định với `insight` và 
 |-------------|----------------|------|
 | No hardcoded secrets | `os.getenv()` cho tất cả config | `config.py` |
 | Slim image | `python:3.11-slim` base | `Dockerfile` |
-| Health check | `/_stcore/health` (Streamlit built-in) | `Dockerfile`, `vercel.toml` |
+| Health check | `/_stcore/health` (Streamlit built-in) | `Dockerfile`, `railway.toml` |
 | Graceful restart | `restart: unless-stopped` | `docker-compose.yml` |
 | Input validation | Kiểm tra file rỗng, giới hạn `MAX_UPLOAD_SIZE_MB` | `analyzer.py` |
 | Error handling | `try/except` bao toàn bộ analyze flow | `app.py`, `api/index.py` |
 | No `.env` committed | `.gitignore` loại trừ `.env`, chỉ commit `.env.example` | `.env.example` |
-| Multi-platform | `vercel.toml` + `render.yaml` + `vercel.json` | root |
+| Multi-platform | `railway.toml` + `render.yaml` + `vercel.json` | root |
 
 ### 6.5: Environment variables
 
@@ -321,60 +380,49 @@ class Settings:
 
 ### 6.6: Deployment
 
-**Platform chính:** Vercel
+**Platform chính:** Railway
 
-**URL:** https://day12-agent-deployment.vercel.app/
+**URL:** https://enthusiastic-amazement-production-7900.up.railway.app
 
-**Screenshot:** ![alt text](image-3.png)
+**Screenshot:** ![Railway deployment](image.png)
 
-**Các bước deploy lên vercel:**
+**Các bước deploy lên Railway:**
 1. Push code lên GitHub
-2. Tạo project mới trên vercel, connect GitHub repo
+2. Tạo project mới trên Railway, connect GitHub repo
 3. Set root directory là `06-lab-complete`
 4. Add environment variables: `OPENAI_API_KEY`, `OPENAI_MODEL`, `APP_NAME`, `MAX_UPLOAD_SIZE_MB`
-5. vercel tự detect `Dockerfile` và build
+5. Railway tự detect `Dockerfile` và build
 
 **Các platform khác được hỗ trợ:**
 
 | Platform | Config file | Notes |
 |----------|-------------|-------|
-| vercel | `vercel.toml` | Dùng Dockerfile, healthcheck `/_stcore/health` |
+| Railway | `railway.toml` | Dùng Dockerfile, healthcheck `/_stcore/health` |
 | Render | `render.yaml` | Docker runtime, region Singapore |
 | Vercel | `vercel.json` | Flask serverless qua `api/index.py` |
 | Docker local | `docker-compose.yml` | `docker compose up --build` |
 
----
+### 6.7: Test commands
 
-##  Submission
+```bash
+# Health check (Streamlit built-in endpoint)
+curl https://enthusiastic-amazement-production-7900.up.railway.app/_stcore/health
+# Expected: {"status": "ok"}
 
-**Submit your GitHub repository URL:**
-
+# Truy cập UI
+open https://enthusiastic-amazement-production-7900.up.railway.app
 ```
-https://github.com/your-username/day12-agent-deployment
-```
 
-**Deadline:** 17/4/2026
+### 6.8: Điểm khác biệt so với các phần trước
 
----
+| Tiêu chí | Part 1–5 (FastAPI agent) | Part 6 (DevCoach MVP) |
+|----------|--------------------------|----------------------|
+| Framework | FastAPI | Streamlit + Flask |
+| Auth | API key / JWT | Không có (internal tool) |
+| Rate limiting | Có (10 req/min) | Không có |
+| UI | Không có (API only) | Streamlit UI đầy đủ |
+| LLM call | Mock | OpenAI GPT-4o-mini thật |
+| Input | Text question | File upload (PDF/TXT/JSON) |
+| Output | Text answer | Structured JSON + UI render |
 
-##  Quick Tips
-
-1.  Test your public URL from a different device
-2.  Make sure repository is public or instructor has access
-3.  Include screenshots of working deployment
-4.  Write clear commit messages
-5.  Test all commands in DEPLOYMENT.md work
-6.  No secrets in code or commit history
-
----
-
-##  Need Help?
-
-- Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- Review [CODE_LAB.md](CODE_LAB.md)
-- Ask in office hours
-- Post in discussion forum
-
----
-
-**Good luck! **
+Không implement rate limiting và auth vì DevCoach MVP là internal tool — không expose public API. Nếu mở rộng thành SaaS thì cần thêm auth layer tương tự Part 4.
