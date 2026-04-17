@@ -1,17 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/download",
-      "destination": "/api/index"
-    }
-  ],
   "functions": {
-    "api/index.py": {
+    "app.py": {
       "excludeFiles": "{.git/**,.venv/**,01-localhost-vs-production/**,02-docker/**,03-cloud-deployment/**,04-api-gateway/**,05-scaling-reliability/**,utils/**,**/__pycache__/**}"
     }
   }
