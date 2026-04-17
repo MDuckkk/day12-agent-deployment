@@ -11,7 +11,50 @@ Trong production: lưu trong Redis/DB, không phải in-memory.
 import time
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from fastapi import HTTPException
+
+# Dùng khi có Redis available, fallback về in-memory nếu không có
+try:
+    import redis as redis_lib
+    _redis_client = redis_lib.Redis(decode_responses=True)
+    _redis_client.ping()
+    REDIS_AVAILABLE = True
+except Exception:
+    _redis_client = None
+    REDIS_AVAILABLE = False
+
+
+def check_budget_redis(user_id: str, estimated_cost: float) -> bool:
+    """
+    Kiểm tra budget theo tháng dùng Redis.
+    Return True nếu còn budget, False nếu vượt $10/tháng.
+
+    Logic:
+    - Mỗi user có budget $10/tháng
+    - Track spending trong Redis với key: budget:<user_id>:<YYYY-MM>
+    - TTL 32 ngày → tự reset đầu tháng sau
+    """
+    if not REDIS_AVAILABLE or _redis_client is None:
+        return True  # Fallback: cho phép nếu Redis không có
+
+    month_key = datetime.now().strftime("%Y-%m")
+    key = f"budget:{user_id}:{month_key}"
+
+    # Lấy số tiền đã dùng trong tháng
+    current = float(_redis_client.get(key) or 0)
+
+    # Kiểm tra nếu cộng thêm estimated_cost có vượt $10 không
+    if current + estimated_cost > 10.0:
+        return False  # Vượt budget → từ chối
+
+    # Cộng dồn chi phí vào Redis
+    _redis_client.incrbyfloat(key, estimated_cost)
+
+    # TTL 32 ngày để tự xóa sau khi hết tháng
+    _redis_client.expire(key, 32 * 24 * 3600)
+
+    return True
 
 logger = logging.getLogger(__name__)
 

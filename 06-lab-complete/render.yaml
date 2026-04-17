@@ -1,23 +1,17 @@
 services:
   - type: web
-    name: ai-agent-production
+    name: devcoach-mvp
     runtime: docker
     region: singapore
     plan: starter
-    healthCheckPath: /health
+    healthCheckPath: /_stcore/health
     autoDeploy: true
     envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: APP_VERSION
-        value: "1.0.0"
       - key: OPENAI_API_KEY
         sync: false
-      - key: AGENT_API_KEY
-        generateValue: true
-      - key: JWT_SECRET
-        generateValue: true
-      - key: DAILY_BUDGET_USD
-        value: "5.0"
-      - key: RATE_LIMIT_PER_MINUTE
-        value: "20"
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: APP_NAME
+        value: DevCoach MVP
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "5"

@@ -27,6 +27,7 @@ from contextlib import asynccontextmanager
 
 
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import uvicorn
 from utils.mock_llm import ask
 
@@ -90,11 +91,15 @@ def root():
     return {"message": "AI Agent with health checks!"}
 
 
+class AskRequest(BaseModel):
+    question: str
+
+
 @app.post("/ask")
-async def ask_agent(question: str):
+async def ask_agent(body: AskRequest):
     if not _is_ready:
         raise HTTPException(503, "Agent not ready")
-    return {"answer": ask(question)}
+    return {"answer": ask(body.question)}
 
 
 # ──────────────────────────────────────────────────────────
