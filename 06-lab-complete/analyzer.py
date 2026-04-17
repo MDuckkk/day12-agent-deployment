@@ -25,13 +25,17 @@ def load_mock_text(directory: Path, item_id: str) -> str:
 
 
 def extract_text(uploaded_file, max_upload_size_mb: int) -> str:
-    content = uploaded_file.getvalue()
+    if hasattr(uploaded_file, "getvalue"):
+        content = uploaded_file.getvalue()
+        file_name = uploaded_file.name.lower()
+    else:
+        content = uploaded_file.read()
+        file_name = getattr(uploaded_file, "filename", "").lower()
     if not content:
         raise ValueError("File is empty.")
     if len(content) > max_upload_size_mb * 1024 * 1024:
         raise ValueError(f"File exceeds {max_upload_size_mb} MB.")
 
-    file_name = uploaded_file.name.lower()
     if file_name.endswith(".pdf"):
         reader = pypdf.PdfReader(io.BytesIO(content))
         return "\n".join(page.extract_text() or "" for page in reader.pages).strip()

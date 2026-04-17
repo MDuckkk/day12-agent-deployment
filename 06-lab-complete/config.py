@@ -1,12 +1,15 @@
 """Minimal config for the MVP Streamlit app."""
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 
-load_dotenv(".env.local")
-load_dotenv(".env")
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env.local")
+load_dotenv(BASE_DIR / ".env")
 
 
 @dataclass

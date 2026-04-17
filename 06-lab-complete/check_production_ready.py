@@ -13,6 +13,8 @@ def run_checks() -> bool:
     base = os.path.dirname(__file__)
     required_files = [
         "app.py",
+        "api/index.py",
+        "vercel.json",
         "analyzer.py",
         "config.py",
         "requirements.txt",
@@ -40,7 +42,13 @@ def run_checks() -> bool:
     if os.path.exists(reqs):
         content = open(reqs, encoding="utf-8").read()
         passed.append(check("Streamlit dependency included", "streamlit" in content.lower()))
+        passed.append(check("Flask dependency included", "flask" in content.lower()))
         passed.append(check("OpenAI dependency included", "openai" in content.lower()))
+
+    vercel_config = os.path.join(base, "vercel.json")
+    if os.path.exists(vercel_config):
+        content = open(vercel_config, encoding="utf-8").read()
+        passed.append(check("Vercel routes configured", "/api/index" in content))
 
     ok = all(passed)
     print(f"\nResult: {'READY' if ok else 'NOT READY'}")
